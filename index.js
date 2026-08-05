@@ -6,7 +6,7 @@ const { CallToolRequestSchema, ListToolsRequestSchema } = require('@modelcontext
 const app = express();
 app.use(express.json());
 
-// Variable en memoria para almacenar la tarea enviada por Spark
+// Cola temporal para almacenar la tarea enviada por Spark
 let tareaPendiente = null;
 
 // Instanciar el servidor MCP
@@ -25,9 +25,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            campo_selector: { type: "string", description: "Selector CSS del campo de texto (ej: '#usuario' o 'input[name=datos]')" },
+            campo_selector: { type: "string", description: "Selector CSS del campo de texto" },
             valor_texto: { type: "string", description: "Texto a escribir en el campo" },
-            boton_selector: { type: "string", description: "Selector CSS del botón a hacer clic (ej: 'button[type=submit]')" }
+            boton_selector: { type: "string", description: "Selector CSS del botón a hacer clic" }
           }
         }
       }
@@ -40,7 +40,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (request.params.name === "ejecutar_tarea_zomatik") {
     const args = request.params.arguments;
     
-    // Guardar la instrucción en la cola temporal
     tareaPendiente = {
       campo: args.campo_selector || null,
       valor: args.valor_texto || null,
@@ -54,11 +53,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   throw new Error("Herramienta no encontrada");
 });
 
-// Endpoint para que la extensión de tu Chromebook descargue la tarea pendiente
+// Endpoint para que la extensión de tu Chromebook descargue tareas pendientes
 app.get("/obtener-tarea", (req, res) => {
   if (tareaPendiente) {
     const tarea = tareaPendiente;
-    tareaPendiente = null; // Limpiar la cola tras entregarla
+    tareaPendiente = null; // Limpiar tras entregar
     return res.json({ tarea });
   }
   res.json({ tarea: null });
@@ -81,5 +80,5 @@ app.post("/messages", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Servidor MCP listo en el puerto ${PORT}`);
+  console.log(`Servidor MCP listo en puerto ${PORT}`);
 });
