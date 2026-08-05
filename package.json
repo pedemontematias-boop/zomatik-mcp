@@ -1,13 +1,13 @@
 {
   "name": "zomatik-mcp",
   "version": "1.0.0",
-  "description": "Servidor MCP para conectar Spark con Zomatik y Chromebook",
+  "description": "Servidor MCP para conectar Spark con Zomatik",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.0.1",
     "cors": "^2.8.5",
     "express": "^4.18.2"
   }
