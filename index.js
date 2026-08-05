@@ -1,21 +1,25 @@
 const express = require('express');
+const cors = require('cors');
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { SSEServerTransport } = require('@modelcontextprotocol/sdk/server/sse.js');
 const { CallToolRequestSchema, ListToolsRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 
 const app = express();
+
+// Habilitar CORS para permitir solicitudes desde cualquier origen (Spark/Gemini)
+app.use(cors());
 app.use(express.json());
 
-// Cola temporal para almacenar la tarea enviada por Spark
+// Variable para almacenar la orden
 let tareaPendiente = null;
 
-// Instanciar el servidor MCP
+// Crear el servidor MCP
 const server = new Server(
   { name: "zomatik-mcp", version: "1.0.0" },
   { capabilities: { tools: {} } }
 );
 
-// 1. Declarar la herramienta que verá Spark
+// Declarar la herramienta para Spark
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
@@ -26,7 +30,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: "object",
           properties: {
             campo_selector: { type: "string", description: "Selector CSS del campo de texto" },
-            valor_texto: { type: "string", description: "Texto a escribir en el campo" },
+            valor_texto: { type: "string", description: "Texto a escribir" },
             boton_selector: { type: "string", description: "Selector CSS del botón a hacer clic" }
           }
         }
@@ -35,7 +39,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   };
 });
 
-// 2. Manejar la orden cuando Spark activa la herramienta
+// Manejar la acción cuando Spark llama a la herramienta
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (request.params.name === "ejecutar_tarea_zomatik") {
     const args = request.params.arguments;
@@ -53,17 +57,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   throw new Error("Herramienta no encontrada");
 });
 
-// Endpoint para que la extensión de tu Chromebook descargue tareas pendientes
+// Endpoint de verificación inicial (Health check)
+app.get("/", (req, res) => {
+  res.send("Servidor MCP de Zomatik activo y funcionando.");
+});
+
+// Endpoint para que la extensión de Chrome descargue tareas
 app.get("/obtener-tarea", (req, res) => {
   if (tareaPendiente) {
     const tarea = tareaPendiente;
-    tareaPendiente = null; // Limpiar tras entregar
+    tareaPendiente = null;
     return res.json({ tarea });
   }
   res.json({ tarea: null });
 });
 
-// Endpoints requeridos por el protocolo MCP (SSE)
+// Protocolo MCP (SSE)
 let transport;
 app.get("/mcp", async (req, res) => {
   transport = new SSEServerTransport("/messages", res);
@@ -80,5 +89,5 @@ app.post("/messages", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Servidor MCP listo en puerto ${PORT}`);
+  console.log(`Servidor MCP ejecutándose en el puerto ${PORT}`);
 });
