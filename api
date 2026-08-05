@@ -1,0 +1,75 @@
+const cors = require('cors');
+
+let tareaPendiente = null;
+
+module.exports = async (req, res) => {
+  // Habilitar CORS visualmente para Google
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, mcp-version');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  const { method, params, id } = req.body || {};
+
+  // Si es la extensión del Chromebook buscando tareas (GET)
+  if (req.method === 'GET' && req.url.includes('obtener-tarea')) {
+    if (tareaPendiente) {
+      const tarea = tareaPendiente;
+      tareaPendiente = null;
+      return res.status(200).json({ tarea });
+    }
+    return res.status(200).json({ tarea: null });
+  }
+
+  // Si es Spark inicializando el protocolo MCP (GET a la URL principal)
+  if (req.method === 'GET') {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.write(`event: endpoint\ndata: /api/mcp\n\n`);
+    return res.end();
+  }
+
+  // Si Spark envía una acción (POST)
+  if (method === "initialize") {
+    return res.status(200).json({ jsonrpc: "2.0", id, result: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "zomatik-vercel", version: "1.0.0" } } });
+  }
+
+  if (method === "tools/list") {
+    return res.status(200).json({
+      jsonrpc: "2.0",
+      id,
+      result: {
+        tools: [{
+          name: "ejecutar_tarea_zomatik",
+          description: "Interactúa con Zomatik",
+          inputSchema: {
+            type: "object",
+            properties: {
+              campo_selector: { type: "string" },
+              valor_texto: { type: "string" },
+              boton_selector: { type: "string" }
+            }
+          }
+        }]
+      }
+    });
+  }
+
+  if (method === "tools/call") {
+    const args = params?.arguments || {};
+    tareaPendiente = {
+      campo: args.campo_selector || null,
+      valor: args.valor_texto || null,
+      boton: args.boton_selector || null
+    };
+    return res.status(200).json({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: "Orden enviada al Chromebook." }] } });
+  }
+
+  res.status(200).json({ jsonrpc: "2.0", id, result: {} });
+};
